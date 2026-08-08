@@ -64,8 +64,8 @@ if env_YYB_SERVER:
 # 无有效地址直接退出
 if len(SERVERS) == 0:
     print("❌ 未配置环境变量 YYB_SERVER")
-print("格式：地址@微信账号标识，多账号换行分隔")
-    print("192.168.1.21:8088")
+    print("格式：yyb-go:8000@账号ID或OpenID，多账号换行分隔")
+    print("示例：yyb-go:8000@1")
     sys.exit(1)
 
 print(f"✅ 读取到 {len(SERVERS)} 个 YYB Go 账号")
