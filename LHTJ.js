@@ -84,16 +84,21 @@ const TASK_HOST = "https://gw2c-hw-open.longfor.com/lmarketing-task-api-mvc-prod
 const MEMBER_GAIA_KEY = "98717e7a-a039-46af-8143-be7558a089c0";
 const TASK_GAIA_KEY = "c06753f1-3e68-437d-b592-b94656ea5517";
 const MINI_SIGN_SECRET = "Q74eKtH5LePYfSjIiflUbCL2gxjTa7rF";
-const DX_MINI_CONFIG = {
+const DX_LOGIN_CONFIG = {
     appId: "d1a43734fc59aeae9f1562dbd70fdf54",
     server: "https://ly-sta.longhu.net/udid/w1",
     cache: true,
     gps: true,
 };
+const DX_TASK_CONFIG = {
+    appId: "1f6460cbfddc06d8e4561e61fda19104",
+    server: "https://ly-sta.longhu.net/udid/w1",
+    cache: true,
+    gps: false,
+};
 const DX_ALPHABET = "S0DOZN9bBJyPV-qczRa3oYvhGlUMrdjW7m2CkE5_FuKiTQXnwe6pg8fs4HAtIL1x=";
 const DX_LID_KEY = "_dx_uzZo5y";
 const DX_TOKEN_KEY = "_dx_raAh8q";
-const DX_STORAGE = new Map();
 const DX_KEY_MAP = {
     SDKVersion: "sv",
     accuracy: "ac",
@@ -130,9 +135,19 @@ const DX_KEY_MAP = {
     gps: "gps",
 };
 const TOKEN_CACHE_FILE = path.join(__dirname, "token_caches", "longfor_token_cache.json");
+const DX_CACHE_FILE = path.join(__dirname, "token_caches", "longfor_dx_cache.json");
 try { fs.mkdirSync(path.dirname(TOKEN_CACHE_FILE), { recursive: true }); } catch (e) {}
+const DX_STORAGE = (() => {
+    try {
+        if (!fs.existsSync(DX_CACHE_FILE)) return new Map();
+        return new Map(Object.entries(JSON.parse(fs.readFileSync(DX_CACHE_FILE, "utf8")) || {}));
+    } catch (e) {
+        return new Map();
+    }
+})();
 const USER_AGENT =
     "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) MicroMessenger/3.9.12 MiniProgramEnv/Windows WindowsWechat/WMPF";
+const TASK_USER_AGENT = `${USER_AGENT} miniProgram/${MINI_APP_ID}`;
 
 function readCache() {
     try {
@@ -148,6 +163,14 @@ function writeCache(cache) {
         fs.writeFileSync(TOKEN_CACHE_FILE, JSON.stringify(cache, null, 2), "utf8");
     } catch (e) {
         console.log(`写入token缓存失败: ${e.message || e}`);
+    }
+}
+
+function writeDxCache() {
+    try {
+        fs.writeFileSync(DX_CACHE_FILE, JSON.stringify(Object.fromEntries(DX_STORAGE), null, 2), "utf8");
+    } catch (e) {
+        console.log(`写入风控指纹缓存失败: ${e.message || e}`);
     }
 }
 
@@ -264,22 +287,32 @@ async function dxCollect(options = {}) {
 
 class MiniDxConstId {
     constructor(options = {}) {
-        this.options = { ...DX_MINI_CONFIG, ...(options || {}) };
+        this.options = { ...DX_LOGIN_CONFIG, ...(options || {}) };
         this.options.appId = this.options.appId || this.options.appKey;
         if (!this.options.server || !this.options.appId) throw new Error("missing dx server/appId");
     }
 
+    storageKey(key) {
+        return `${this.options.appId}:${key}`;
+    }
+
     getToken() {
-        return DX_STORAGE.get(DX_TOKEN_KEY) || "";
+        return DX_STORAGE.get(this.storageKey(DX_TOKEN_KEY)) || "";
     }
 
     setToken(token) {
-        DX_STORAGE.set(DX_TOKEN_KEY, token);
+        DX_STORAGE.set(this.storageKey(DX_TOKEN_KEY), token);
+        writeDxCache();
+    }
+
+    setLid(lid) {
+        DX_STORAGE.set(this.storageKey(DX_LID_KEY), lid);
+        writeDxCache();
     }
 
     async getLid() {
-        const lid = DX_STORAGE.get(DX_LID_KEY) || `${Date.now()}${dxMakeLocalId()}`;
-        DX_STORAGE.set(DX_LID_KEY, lid);
+        const lid = DX_STORAGE.get(this.storageKey(DX_LID_KEY)) || `${Date.now()}${dxMakeLocalId()}`;
+        if (!DX_STORAGE.has(this.storageKey(DX_LID_KEY))) this.setLid(lid);
         return lid;
     }
 
@@ -334,16 +367,16 @@ class MiniDxConstId {
             return data.data;
         }
         if (status === -4 && data.data) {
-            DX_STORAGE.set(DX_LID_KEY, data.data);
+            this.setLid(data.data);
             return this.detect();
         }
         return this.detect();
     }
 }
 
-async function getDxToken() {
-    if (process.env.longfor_dx_token) return process.env.longfor_dx_token;
-    return new MiniDxConstId().generate();
+async function getDxToken(config, envName) {
+    if (process.env[envName]) return process.env[envName];
+    return new MiniDxConstId(config).generate();
 }
 
 function ok(code) {
@@ -422,7 +455,7 @@ class Task {
 
     taskHeaders(dxToken = "") {
         const headers = {
-            "User-Agent": USER_AGENT,
+            "User-Agent": TASK_USER_AGENT,
             "Referer": "https://longzhu.longfor.com/longball-homeh5/",
             "Content-Type": "application/json;charset=UTF-8",
             "X-GAIA-API-KEY": TASK_GAIA_KEY,
@@ -433,8 +466,8 @@ class Task {
         };
         if (dxToken) {
             headers["X-LF-DXRisk-Token"] = dxToken;
-            headers["X-LF-DXRisk-Source"] = 3;
-            headers["X-LF-DXRisk-Captcha-Token"] = "";
+            headers["X-LF-DXRisk-Source"] = 5;
+            headers["X-LF-DXRisk-Captcha-Token"] = "undefined";
         }
         return headers;
     }
@@ -486,7 +519,7 @@ class Task {
     }
 
     async loginByWxCode() {
-        const fingerprint = await getDxToken();
+        const fingerprint = await getDxToken(DX_LOGIN_CONFIG, "longfor_dx_token");
         const checkCode = await this.getLoginCode();
         if (!checkCode) {
             throw new Error(`获取微信code失败：请检查 YYB_SERVER 中该账号在 YYB Go 是否已绑定龙湖天街小程序（appId ${MINI_APP_ID}）`);
@@ -580,7 +613,7 @@ class Task {
         console.log(`账号[${this.index}] 活动: ${pageInfo.task_name || "签到"} 今日=${this.todaySigned(pageInfo) ? "已签到" : "未签到"}`);
         if (this.todaySigned(pageInfo)) return;
 
-        const dxToken = await getDxToken();
+        const dxToken = await getDxToken(DX_TASK_CONFIG, "longfor_task_dx_token");
         console.log(`账号[${this.index}] 风控指纹${dxToken ? "获取成功" : "获取失败，直接尝试"}`);
 
         const result = await this.taskPost("/openapi/task/v1/signature/clock", { activity_no: this.activityNo }, dxToken);
@@ -610,6 +643,9 @@ class Task {
         } catch (e) {
             if (!tokenError(e)) {
                 console.log(`账号[${this.index}] 签到失败${e.code ? `(${e.code})` : ""}: ${e.message || e}`);
+                if (String(e.code) === "801810") {
+                    console.log(`账号[${this.index}] 服务端已触发活动风控；同一终端每日仅可参与一次，不自动更换指纹重试`);
+                }
                 return;
             }
             this.removeCachedToken();
