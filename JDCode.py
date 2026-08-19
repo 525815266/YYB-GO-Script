@@ -193,10 +193,35 @@ def parse_jsonish(raw: str) -> Dict[str, Any]:
 
 
 def response_message(payload: Any) -> str:
-    value = nested_value(payload, ("errmsg", "errMsg", "message", "msg", "error"))
+    value = nested_value(
+        payload,
+        (
+            "errmsg",
+            "errMsg",
+            "message",
+            "msg",
+            "error",
+            "retMsg",
+            "resultMsg",
+            "errorMessage",
+        ),
+    )
     if isinstance(value, (dict, list)):
         return json.dumps(value, ensure_ascii=False)[:300]
     return str(value or "").strip()[:300]
+
+
+def jd_login_message(payload: Any) -> str:
+    message = response_message(payload)
+    ret_code = str(
+        nested_value(payload, ("retCode", "resultCode", "errorCode")) or ""
+    ).strip()
+    lowered = message.lower()
+    if ret_code == "201" or "pin not exist" in lowered:
+        return "该微信尚未关联可用的京东账号，请先在京东小程序完成登录/绑定"
+    if ret_code == "202" or "risk user" in lowered:
+        return "京东判定当前账号存在风控，请先在京东 App 或小程序完成安全验证"
+    return message
 
 
 def request_json(
@@ -827,7 +852,8 @@ def attempt_code_login(account: Dict[str, str], full: bool = False) -> str:
             return exchange_pt_cookie(account)
         except Exception as exc:
             exchange_error = str(exc)
-    message = response_message(payload)
+    message = jd_login_message(payload)
+    ret_code = nested_value(payload, ("retCode", "resultCode", "errorCode"))
     payload_fields = (
         ",".join(str(key) for key in payload.keys())
         if isinstance(payload, dict)
@@ -835,6 +861,8 @@ def attempt_code_login(account: Dict[str, str], full: bool = False) -> str:
     )
     jar_fields = ",".join(sorted({item.name for item in session.cookie_jar}))
     detail = []
+    if ret_code not in (None, ""):
+        detail.append("业务码=" + str(ret_code))
     if payload_fields:
         detail.append("响应字段=" + payload_fields)
     if jar_fields:
