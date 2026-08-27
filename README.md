@@ -8,6 +8,36 @@ YYB Go 适配版。
 |--------|------|------|
 | `YYB_SERVER` | `地址@微信账号标识`，一行一个 | `172.17.0.4:8000@XXXXXXXXXX` |
 
+## WPS.js（YYB 协议）
+
+`WPS.js` 使用 `YYB_SERVER` 获取每个账号的小程序 code，不再要求手工抓取 WPS Cookie。脚本保留原有 WPS 超级会员签到、浏览和抽奖，并增加任务中心、天天领福利和挑战计划任务。
+
+```bash
+task SuperNaiBA_YYB-GO-Script/WPS.js
+```
+
+可选环境变量（默认开启的功能可按需关闭）：
+
+| 变量名 | 默认值 | 说明 |
+|--------|--------|------|
+| `WPS_SVIP_APPLET` | `1` | 超级会员小程序签到、浏览、抽奖 |
+| `WPS_TASK_CENTER` | `1` | WPS 任务中心签到、任务和奖励 |
+| `WPS_WELFARE` | `1` | 天天领福利签到和抽奖 |
+| `WPS_CHALLENGE` | `1` | WPS 挑战计划任务和奖励 |
+| `WPS_OFFICE_ASSISTANT` | `0` | 办公助手；附件注明活动已结束，默认关闭 |
+| `WPS_BROWSE_WAIT` | `10` | 浏览任务等待秒数，实际会在设定值上下浮动 1 秒 |
+| `WPS_LOTTERY_LIMIT` | `5` | 单账号单活动最多抽奖次数 |
+| `YYB_API_KEY` | 空 | YYB 开启 API Key 校验时填写 |
+
+示例：
+
+```text
+YYB_SERVER=yyb-go:8000@1
+yyb-go:8000@3
+```
+
+脚本会缓存 WPS 登录态和短期 `operateWxData` 数据；缓存失效后自动重新登录。活动编号由 WPS 服务端控制，若某个活动结束，可只将对应开关设为 `0`，不影响其他模块。
+
 ## 青龙订阅
 
 ```
