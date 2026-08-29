@@ -14,6 +14,23 @@ YYB Go 适配版。
 ql repo https://github.com/SuperNaiBA/YYB-GO-Script.git "" "SendNotify.py" "main" ""
 ```
 
+## YYB 适配脚本
+
+以下脚本统一使用 `YYB_SERVER` 获取微信 code，支持多账号（每行一个 `地址@账号ID或OpenID`）：
+
+```text
+lz飞天.py
+格力高club.py
+爱裹旧衣服回收_co.py
+白鲸鱼旧衣服回收_c.py
+察理王子_code版.py
+回收猿旧衣服回收_c.py
+牛牛免费短剧.py
+印象星.py
+```
+
+YYB 服务接口为 `POST /wxapp/getCode`，请求体包含对应小程序的 `app_id` 和账号 `ref`。如 YYB 开启 API Key，可额外设置 `YYB_API_KEY`。
+
 ## 京东 Cookie 脚本
 
 仓库提供两个京东小程序登录脚本，登录逻辑相同（code → login_lt → PT OAuth 兜底），区别在于 cookie 写入方式：
